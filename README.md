@@ -53,6 +53,28 @@ targets: [
 
 注意 `package:` 必须是仓库名 `LumiPluginPluginManager`，不是 product 名。
 
+## 品牌化：注入自己的插件 id
+
+宿主应用可以用自己的品牌 id 复用本包（与 `PluginSettingView` / `PluginStorage` /
+`PluginToast` 的做法一致）。不传参时使用默认的 `com.coffic.lumi.plugin.plugin-manager`。
+
+```swift
+PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
+```
+
+注入后以下三处同步跟随：
+
+| 位置 | 取值 |
+| --- | --- |
+| `PluginPluginManager.id` | 注入的 id |
+| `PluginPluginManager.metadata.id` | 注入的 id |
+| 日志 subsystem（`Logger`） | 注入的 id |
+
+设置入口 id 恒为 `"plugin-manager"`（与品牌无关，供设置深链使用）；
+提示建议 id 为 `"\(id).browse"`。
+
+> 更换 id 会同时更换插件的启用状态存储键：宿主切换 id 前需确认历史状态是否需要迁移。
+
 ## Testing
 
 From this package directory:

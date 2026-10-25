@@ -10,19 +10,17 @@ import os
 /// 插件管理插件
 @MainActor
 public final class PluginPluginManager: SuperPlugin, SuperLog {
-    nonisolated static let logger = Logger(subsystem: "com.coffic.lumi.plugin.plugin-manager", category: "PluginManager")
-    public let id = "com.coffic.lumi.plugin.plugin-manager"
+    /// 默认插件标识。宿主可在装配时传入自己的 id。
+    public static let defaultPluginID = "com.coffic.lumi.plugin.plugin-manager"
+
+    /// 插件唯一标识。宿主可注入自己的品牌 id。
+    public let id: String
     public let order = 90
 
-    public let metadata = PluginMetadata(
-        id: "com.coffic.lumi.plugin.plugin-manager",
-        name: pluginLocalization.string("Plugin Manager"),
-        description: pluginLocalization.string("Manage all registered plugins."),
-        version: "1.0.0",
-        category: .system,
-        stage: .stable,
-        policy: .required
-    )
+    public let metadata: PluginMetadata
+
+    /// 日志子系统跟随插件 id，便于宿主在系统日志中区分品牌。
+    nonisolated let logger: Logger
 
     private var generatedAboutPluginIDs: [String] = []
 
@@ -33,7 +31,22 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
     private var viewModel: PluginManagementViewModel?
     private var observer: PluginManagementObserver?
 
-    public init() {}
+    /// 创建插件管理插件。
+    ///
+    /// - Parameter id: 插件唯一标识，决定 `PluginMetadata.id` 与日志子系统。
+    public init(id: String = PluginPluginManager.defaultPluginID) {
+        self.id = id
+        self.metadata = PluginMetadata(
+            id: id,
+            name: pluginLocalization.string("Plugin Manager"),
+            description: pluginLocalization.string("Manage all registered plugins."),
+            version: "1.0.0",
+            category: .system,
+            stage: .stable,
+            policy: .required
+        )
+        self.logger = Logger(subsystem: id, category: "PluginManager")
+    }
 
     private var promptSuggestion: PromptSuggestion {
         PromptSuggestion(
@@ -62,19 +75,19 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
 
     public func onBoot(kernel: KernelCoreContainer) throws {
         guard let settings = kernel.resolveProvider((any SettingViewProviding).self) else {
-            Self.logger.error("\(Self.t) SettingViewProviding not found")
+            logger.error("\(Self.t) SettingViewProviding not found")
             return
         }
 
         guard let manager = kernel.resolveProvider((any PluginManaging).self) else {
-            Self.logger.error("\(Self.t) PluginManaging not found")
+            logger.error("\(Self.t) PluginManaging not found")
             return
         }
 
         // 捕获 docs/provider 引用，供插件管理详情面板展示各插件的 about 视图。
         let docsProvider = kernel.resolveProvider((any DocsViewProviding).self)
         if docsProvider == nil {
-            Self.logger.error("\(Self.t) DocsViewProviding not found")
+            logger.error("\(Self.t) DocsViewProviding not found")
         }
 
         let capability = PluginManagementCapabilityAdapter(manager: manager)
@@ -85,7 +98,8 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
         observer?.cancel()
         observer = PluginManagementObserver(
             capability: capability,
-            viewModel: viewModel
+            viewModel: viewModel,
+            subsystem: id
         )
         self.capability = capability
         self.viewModel = viewModel
