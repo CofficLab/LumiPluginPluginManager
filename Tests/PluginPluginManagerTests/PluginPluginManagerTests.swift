@@ -116,6 +116,52 @@ struct PluginPluginManagerTests {
         #expect(suggestion?.action == .openSettingsTab(PluginPluginManager.settingsEntryID))
     }
 
+    /// 插件数量低于阈值时不显示搜索框，达到阈值才显示。
+    @Test("插件数量低于 10 个时不显示搜索框")
+    func searchBarHiddenBelowPluginCountThreshold() {
+        let capability = TestPluginManagementCapability(
+            plugins: (0..<9).map { TestPlugin(id: "plugin-\($0)", policy: .enabledByDefault) }
+        )
+        let viewModel = PluginManagementViewModel(
+            capability: capability,
+            docsCapability: PluginManagerDocsCapabilityAdapter(docs: nil)
+        )
+
+        viewModel.refresh()
+        #expect(viewModel.plugins.count == 9)
+        #expect(viewModel.showsSearchBar == false)
+
+        capability.plugins.append(TestPlugin(id: "plugin-9", policy: .enabledByDefault))
+        viewModel.refresh()
+        #expect(viewModel.plugins.count == 10)
+        #expect(viewModel.showsSearchBar == true)
+    }
+
+    /// 搜索框的显隐只看插件总数，不随筛选 / 搜索命中的条数变化，
+    /// 否则用户一输入关键字搜索框就会消失，无法清空。
+    @Test("搜索框显隐按插件总数判定，不随筛选结果变化")
+    func searchBarVisibilityIgnoresFilters() {
+        let capability = TestPluginManagementCapability(
+            plugins: (0..<10).map { TestPlugin(id: "plugin-\($0)", policy: .enabledByDefault) }
+        )
+        let viewModel = PluginManagementViewModel(
+            capability: capability,
+            docsCapability: PluginManagerDocsCapabilityAdapter(docs: nil)
+        )
+
+        viewModel.refresh()
+        #expect(viewModel.showsSearchBar)
+
+        viewModel.searchText = "不存在的关键字"
+        #expect(viewModel.filteredPlugins.isEmpty)
+        #expect(viewModel.showsSearchBar)
+
+        viewModel.searchText = ""
+        viewModel.statusFilter = .enabled
+        #expect(viewModel.filteredPlugins.isEmpty)
+        #expect(viewModel.showsSearchBar)
+    }
+
     /// 设置视图未注册时优雅降级：onBoot 不抛错、不贡献入口。
     @Test
     func onBootDegradesGracefullyWithoutSettingsProvider() throws {

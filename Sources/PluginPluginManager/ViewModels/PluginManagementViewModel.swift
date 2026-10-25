@@ -66,6 +66,21 @@ final class PluginManagementViewModel: ObservableObject {
         plugins.reduce(0) { $0 + ($1.isEnabled ? 1 : 0) }
     }
 
+    // MARK: - 搜索框显隐
+
+    /// 搜索框的显示阈值：可配置插件数量达到该值才显示搜索框。
+    ///
+    /// 插件数量少的时候列表一眼就看得完，搜索框只是噪音。
+    static let searchVisibilityThreshold = 10
+
+    /// 是否显示搜索框。
+    ///
+    /// 只看**插件总数**，不看筛选 / 搜索命中的条数：否则用户一输入关键字、
+    /// 命中数掉到阈值以下，搜索框就会自己消失，用户没法清空关键字。
+    var showsSearchBar: Bool {
+        plugins.count >= Self.searchVisibilityThreshold
+    }
+
     /// Observer 收到插件列表或启用状态事件后调用，重新生成整个页面状态。
     func refresh() {
         plugins = capability.allPlugins

@@ -76,10 +76,13 @@ struct PluginManagementView: View {
     private var pluginListPane: some View {
         VStack(spacing: 0) {
             VStack(spacing: 10) {
-                AppSearchBar(
-                    text: $viewModel.searchText,
-                    placeholder: LocalizedStringKey(PluginPluginManagerText.searchPlugins)
-                )
+                // 插件数量少的时候不显示搜索框（列表一眼可见，搜索只是噪音）。
+                if viewModel.showsSearchBar {
+                    AppSearchBar(
+                        text: $viewModel.searchText,
+                        placeholder: LocalizedStringKey(PluginPluginManagerText.searchPlugins)
+                    )
+                }
 
                 AppSegmentedControl(
                     PluginManagementFilter.allCases.map(\.title),

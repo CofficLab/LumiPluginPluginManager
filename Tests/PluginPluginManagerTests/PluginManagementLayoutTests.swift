@@ -90,6 +90,22 @@ struct PluginManagementLayoutTests {
         )
     }
 
+    /// 搜索框必须按插件数量阈值条件渲染：插件少的时候列表一眼可见，搜索是噪音。
+    @Test("搜索框按插件数量阈值条件渲染")
+    func searchBarIsGatedByPluginCount() throws {
+        let view = try Self.source("Sources/PluginPluginManager/Views/PluginManagementView.swift")
+        let code = String(Self.blankOutStringsAndComments(view))
+        #expect(
+            code.contains("if viewModel.showsSearchBar"),
+            Comment(rawValue: "AppSearchBar 必须包在 `if viewModel.showsSearchBar` 里，"
+                + "插件数量低于阈值时不显示搜索功能")
+        )
+        #expect(
+            code.components(separatedBy: "AppSearchBar").count == 2,
+            Comment(rawValue: "AppSearchBar 只应出现一次，且位于条件分支内")
+        )
+    }
+
     // MARK: - 源码扫描工具
 
     /// 把字符串字面量与注释替换成空格（保留换行，长度与行号不变）。
