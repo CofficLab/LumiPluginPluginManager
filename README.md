@@ -75,6 +75,31 @@ PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
 
 > 更换 id 会同时更换插件的启用状态存储键：宿主切换 id 前需确认历史状态是否需要迁移。
 
+## 入口可见性：无可配置插件时隐藏入口
+
+插件管理页只列出**用户可配置**的插件（`PluginEnablePolicy.isConfigurable`，
+即 `enabledByDefault` / `disabledByDefault`）。
+
+若宿主的插件策略全是 `required` / `alwaysOn`（`isConfigurable` 为 false），
+这个页面必然是一个永远为空的列表 —— 这样的入口对用户没有意义，反而让人以为
+功能坏了。这类宿主可以传 `.onlyWhenConfigurablePluginsExist`：
+
+```swift
+PluginPluginManager(entryVisibility: .onlyWhenConfigurablePluginsExist)
+```
+
+| 策略 | 行为 |
+| --- | --- |
+| `.always`（默认） | 始终注册「插件管理」入口 |
+| `.onlyWhenConfigurablePluginsExist` | 仅当宿主存在用户可配置的插件时注册入口 |
+
+> 判断发生在 `onReady` 阶段（而非 `onBoot`）：`KernelCoreContainer.start` 先注册
+> 全部插件、再逐个执行 `onBoot`，`onBoot` 阶段 order 更大的插件尚未注册，
+> 据此判断会漏掉插件。
+
+默认策略保持 `.always`，是为了不影响 Lumi 主项目 —— 它有大量可配置插件
+（StoryWriter / Terminal / Mail / TextActions 等），插件管理页在那里是有意义的。
+
 ## Testing
 
 From this package directory:

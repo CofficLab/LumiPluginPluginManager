@@ -65,9 +65,12 @@ struct PluginPluginManagerTests {
         #expect(plugin.metadata.stage == .stable)
     }
 
-    /// onBoot 注册「插件管理」设置入口；onShutdown 撤回入口。
+    /// onReady 注册「插件管理」设置入口；onShutdown 撤回入口。
+    ///
+    /// 入口在 `onReady`（而非 `onBoot`）注册：`entryVisibility` 需要依据
+    /// **全部**插件的策略判断，而 `onBoot` 阶段 order 更大的插件尚未注册。
     @Test
-    func onBootRegistersSettingEntryAndShutdownRemoves() throws {
+    func onReadyRegistersSettingEntryAndShutdownRemoves() throws {
         let settings = DefaultSettingViewProviding()
         let kernel = KernelCoreContainer()
         try kernel.registerProvider((any SettingViewProviding).self, settings)
@@ -78,6 +81,7 @@ struct PluginPluginManagerTests {
 
         let plugin = PluginPluginManager()
         try plugin.onBoot(kernel: kernel)
+        try plugin.onReady(kernel: kernel)
         #expect(settings.entries.contains { $0.id == "plugin-manager" })
 
         try plugin.onShutdown(kernel: kernel)
@@ -97,6 +101,7 @@ struct PluginPluginManagerTests {
 
         let plugin = PluginPluginManager()
         try plugin.onBoot(kernel: kernel)
+        try plugin.onReady(kernel: kernel)
 
         let entry = settings.entries.first { $0.id == "plugin-manager" }
         #expect(entry?.title == "插件管理")

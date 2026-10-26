@@ -31,11 +31,40 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
     private var viewModel: PluginManagementViewModel?
     private var observer: PluginManagementObserver?
 
+    /// 设置 Provider 的引用。入口在 `onReady` 注册（见 `onBoot` 注释）。
+    private var settingsProvider: (any SettingViewProviding)?
+
+    /// 入口可见性策略。
+    public enum EntryVisibility: Sendable {
+        /// 始终注册「插件管理」入口（默认）。
+        ///
+        /// 宿主存在可配置插件时这是正确行为：用户在这里启停插件。
+        case always
+        /// 仅当宿主存在**用户可配置**的插件时才注册入口。
+        ///
+        /// 宿主的插件策略全是 `required` / `alwaysOn`（`isConfigurable` 为 false）
+        /// 时，插件管理页必然是一个永远为空的列表 —— 这样的入口对用户没有意义，
+        /// 反而让人以为功能坏了。此时跳过注册。
+        ///
+        /// - Note: 判断在 `onReady` 阶段进行。`onBoot` 阶段 order 更大的插件
+        ///   尚未注册，`kernel.allPlugins` 还不完整，据此判断会漏掉插件。
+        case onlyWhenConfigurablePluginsExist
+    }
+
+    /// 入口可见性策略。默认 `.always`，保持既有宿主的行为不变。
+    public let entryVisibility: EntryVisibility
+
     /// 创建插件管理插件。
     ///
-    /// - Parameter id: 插件唯一标识，决定 `PluginMetadata.id` 与日志子系统。
-    public init(id: String = PluginPluginManager.defaultPluginID) {
+    /// - Parameters:
+    ///   - id: 插件唯一标识，决定 `PluginMetadata.id` 与日志子系统。
+    ///   - entryVisibility: 「插件管理」设置入口的可见性策略。
+    public init(
+        id: String = PluginPluginManager.defaultPluginID,
+        entryVisibility: EntryVisibility = .always
+    ) {
         self.id = id
+        self.entryVisibility = entryVisibility
         self.metadata = PluginMetadata(
             id: id,
             name: pluginLocalization.string("Plugin Manager"),
@@ -104,16 +133,11 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
         self.capability = capability
         self.viewModel = viewModel
 
-        let entry = SettingEntryItem(
-            id: Self.settingsEntryID,
-            title: pluginLocalization.string("Plugin Manager"),
-            systemImage: "puzzlepiece.extension",
-            order: 3
-        ) { [viewModel] in
-            PluginManagementView(viewModel: viewModel)
-        }
-
-        settings.addEntries([entry])
+        // 「插件管理」入口在 `onReady` 注册，而不是这里：`entryVisibility`
+        // 需要依据**全部**插件的策略判断，而 `onBoot` 阶段 order 更大的插件
+        // 尚未注册（见 `KernelCoreContainer.start` —— 先全部注册，再逐个 onBoot）。
+        // 这里只把设置 Provider 的解析结果留到 onReady 使用。
+        self.settingsProvider = settings
     }
 
     public func onReady(kernel: KernelCoreContainer) throws {
@@ -124,6 +148,29 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
         viewModel?.refresh()
 
         registerPromptSuggestion(kernel: kernel, requiresEnable: false)
+
+        // 按可见性策略决定是否注册「插件管理」入口。
+        //
+        // `.onlyWhenConfigurablePluginsExist` 时，若宿主没有用户可配置的插件，
+        // 这个页面必然是空的 —— 不注册入口，避免设置里出现一个点进去什么都没有
+        // 的死路。此处是唯一可靠的判断时机：此刻全部插件已注册完毕。
+        if let viewModel {
+            if shouldRegisterSettingsEntry(kernel: kernel) {
+                let entry = SettingEntryItem(
+                    id: Self.settingsEntryID,
+                    title: pluginLocalization.string("Plugin Manager"),
+                    systemImage: "puzzlepiece.extension",
+                    order: 3
+                ) { [viewModel] in
+                    PluginManagementView(viewModel: viewModel)
+                }
+                settingsProvider?.addEntries([entry])
+            } else {
+                logger.info(
+                    "\(Self.t) skip plugin manager settings entry: host has no user-configurable plugins"
+                )
+            }
+        }
 
         // 确保每个已启动插件都有 AboutView。插件自己的品牌化页面优先，
         // 这里只为尚未贡献页面的插件补充统一的详细元信息页。
@@ -138,6 +185,16 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
         }
     }
 
+    /// 是否应注册「插件管理」设置入口。
+    private func shouldRegisterSettingsEntry(kernel: KernelCoreContainer) -> Bool {
+        switch entryVisibility {
+        case .always:
+            return true
+        case .onlyWhenConfigurablePluginsExist:
+            return kernel.allPlugins.contains { $0.metadata.policy.isConfigurable }
+        }
+    }
+
     public func onEnable(kernel: KernelCoreContainer) async throws {
         registerPromptSuggestion(kernel: kernel, requiresEnable: false)
     }
@@ -147,6 +204,7 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
         observer = nil
         viewModel = nil
         capability = nil
+        settingsProvider = nil
         kernel.resolveProvider((any SettingViewProviding).self)?
             .removeEntries(ids: [Self.settingsEntryID])
 

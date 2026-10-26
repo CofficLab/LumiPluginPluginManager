@@ -71,6 +71,7 @@ struct PluginPluginManagerIDParameterizationTests {
         let plugin = PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
         try plugin.onRegister(kernel: kernel)
         try plugin.onBoot(kernel: kernel)
+        try plugin.onReady(kernel: kernel)
 
         // 设置入口 id 是稳定的 "plugin-manager"，与品牌无关。
         #expect(settings.entries.contains { $0.id == "plugin-manager" })
