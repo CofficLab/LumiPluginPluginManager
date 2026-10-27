@@ -26,7 +26,10 @@ struct PluginPluginManagerIDParameterizationTests {
     /// 宿主注入自定义 id 后，插件 id 与元数据 id 同步跟随。
     @Test("注入自定义 id 后插件 id 与元数据 id 同步跟随")
     func injectedIDPropagatesToMetadata() {
-        let plugin = PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
+        let plugin = PluginPluginManager(
+            id: "com.coffic.wakey.plugin.plugin-manager",
+            entryVisibility: .always
+        )
         #expect(plugin.id == "com.coffic.wakey.plugin.plugin-manager")
         #expect(plugin.metadata.id == "com.coffic.wakey.plugin.plugin-manager")
     }
@@ -34,7 +37,10 @@ struct PluginPluginManagerIDParameterizationTests {
     /// 注入 id 后其余元数据（顺序 / 策略 / 分类 / 阶段）不受影响。
     @Test("注入自定义 id 不影响其它元数据")
     func injectedIDKeepsOtherMetadata() {
-        let plugin = PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
+        let plugin = PluginPluginManager(
+            id: "com.coffic.wakey.plugin.plugin-manager",
+            entryVisibility: .always
+        )
         #expect(plugin.order == 90)
         #expect(plugin.metadata.policy == .required)
         #expect(plugin.metadata.category == .system)
@@ -45,7 +51,10 @@ struct PluginPluginManagerIDParameterizationTests {
     @Test("注入自定义 id 后注册进内核的 key 同步跟随")
     func injectedIDRegistersUnderCustomKey() throws {
         let kernel = KernelCoreContainer()
-        let plugin = PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
+        let plugin = PluginPluginManager(
+            id: "com.coffic.wakey.plugin.plugin-manager",
+            entryVisibility: .always
+        )
 
         // `start` 内部会完成注册，不要再单独调用 `registerPlugin`。
         try kernel.start(plugins: [plugin])
@@ -68,7 +77,10 @@ struct PluginPluginManagerIDParameterizationTests {
             DefaultPluginManager(kernel: kernel)
         )
 
-        let plugin = PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
+        let plugin = PluginPluginManager(
+            id: "com.coffic.wakey.plugin.plugin-manager",
+            entryVisibility: .always
+        )
         try plugin.onRegister(kernel: kernel)
         try plugin.onBoot(kernel: kernel)
         try plugin.onReady(kernel: kernel)
@@ -82,14 +94,28 @@ struct PluginPluginManagerIDParameterizationTests {
     }
 
     /// 注入 id 后提示建议的 id 跟随变化（否则会与上游建议冲突或串台）。
+    ///
+    /// 提示建议跟随「插件管理」设置入口：入口存在时才注册，所以这里要跑
+    /// 完整的 `onBoot` + `onReady`。
     @Test("注入自定义 id 后提示建议 id 同步跟随")
     func injectedIDPropagatesToPromptSuggestion() throws {
+        let settings = DefaultSettingViewProviding()
         let suggestions = DefaultPromptSuggestionProvider()
         let kernel = KernelCoreContainer()
+        try kernel.registerProvider((any SettingViewProviding).self, settings)
         try kernel.registerProvider((any PromptSuggestionProviding).self, suggestions)
+        try kernel.registerProvider(
+            (any PluginManaging).self,
+            DefaultPluginManager(kernel: kernel)
+        )
 
-        let plugin = PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
+        let plugin = PluginPluginManager(
+            id: "com.coffic.wakey.plugin.plugin-manager",
+            entryVisibility: .always
+        )
         try plugin.onRegister(kernel: kernel)
+        try plugin.onBoot(kernel: kernel)
+        try plugin.onReady(kernel: kernel)
 
         let suggestion = suggestions.allSuggestions.first { $0.pluginID == plugin.id }
         #expect(suggestion != nil)
@@ -100,12 +126,23 @@ struct PluginPluginManagerIDParameterizationTests {
     /// 注销时按注入的 id 撤回提示建议。
     @Test("注入自定义 id 后注销撤回对应提示建议")
     func injectedIDUnregistersOwnSuggestion() throws {
+        let settings = DefaultSettingViewProviding()
         let suggestions = DefaultPromptSuggestionProvider()
         let kernel = KernelCoreContainer()
+        try kernel.registerProvider((any SettingViewProviding).self, settings)
         try kernel.registerProvider((any PromptSuggestionProviding).self, suggestions)
+        try kernel.registerProvider(
+            (any PluginManaging).self,
+            DefaultPluginManager(kernel: kernel)
+        )
 
-        let plugin = PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
+        let plugin = PluginPluginManager(
+            id: "com.coffic.wakey.plugin.plugin-manager",
+            entryVisibility: .always
+        )
         try plugin.onRegister(kernel: kernel)
+        try plugin.onBoot(kernel: kernel)
+        try plugin.onReady(kernel: kernel)
         #expect(suggestions.allSuggestions.contains { $0.id == "com.coffic.wakey.plugin.plugin-manager.browse" })
 
         try plugin.onUnregister(kernel: kernel)

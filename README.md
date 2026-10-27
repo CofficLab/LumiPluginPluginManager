@@ -82,23 +82,38 @@ PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
 
 若宿主的插件策略全是 `required` / `alwaysOn`（`isConfigurable` 为 false），
 这个页面必然是一个永远为空的列表 —— 这样的入口对用户没有意义，反而让人以为
-功能坏了。这类宿主可以传 `.onlyWhenConfigurablePluginsExist`：
+功能坏了。
 
-```swift
-PluginPluginManager(entryVisibility: .onlyWhenConfigurablePluginsExist)
-```
+**默认行为就是隐藏**：宿主零配置即可得到正确结果，无需在 Factory 里写任何
+参数。宿主将来加入可配置插件时，入口会自动出现。
 
 | 策略 | 行为 |
 | --- | --- |
-| `.always`（默认） | 始终注册「插件管理」入口 |
-| `.onlyWhenConfigurablePluginsExist` | 仅当宿主存在用户可配置的插件时注册入口 |
+| `.onlyWhenConfigurablePluginsExist`（默认） | 仅当宿主存在用户可配置的插件时注册入口 |
+| `.always` | 始终注册「插件管理」入口 |
+
+绝大多数宿主不需要显式传任何值：
+
+```swift
+PluginPluginManager()   // 零配置：无可配置插件时不显示入口
+```
+
+仅在宿主明知自己没有可配置插件、却仍要保留这个入口时才显式覆盖：
+
+```swift
+PluginPluginManager(entryVisibility: .always)
+```
 
 > 判断发生在 `onReady` 阶段（而非 `onBoot`）：`KernelCoreContainer.start` 先注册
 > 全部插件、再逐个执行 `onBoot`，`onBoot` 阶段 order 更大的插件尚未注册，
 > 据此判断会漏掉插件。
 
-默认策略保持 `.always`，是为了不影响 Lumi 主项目 —— 它有大量可配置插件
-（StoryWriter / Terminal / Mail / TextActions 等），插件管理页在那里是有意义的。
+「浏览插件」提示建议跟随入口：入口不存在时不会注册该建议 —— 它的动作是
+`openSettingsTab("plugin-manager")`，入口被撤掉后这个深链就是死路。
+
+> 入口的可见性在启动时判定一次。当前插件目录是编译期固定的
+> （`unloadPlugin` / `reloadPlugin` 在生产代码中未被调用），运行期插件列表
+> 事实上不会变化，因此不需要监听插件列表变化事件。
 
 ## Testing
 

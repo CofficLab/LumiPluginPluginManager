@@ -69,6 +69,9 @@ struct PluginPluginManagerTests {
     ///
     /// 入口在 `onReady`（而非 `onBoot`）注册：`entryVisibility` 需要依据
     /// **全部**插件的策略判断，而 `onBoot` 阶段 order 更大的插件尚未注册。
+    ///
+    /// 这里显式传 `.always`：测试只关心入口的呈现细节（标题 / 图标 / 顺序），
+    /// 不想让「宿主有无���配置插件」影响断言。
     @Test
     func onReadyRegistersSettingEntryAndShutdownRemoves() throws {
         let settings = DefaultSettingViewProviding()
@@ -79,7 +82,7 @@ struct PluginPluginManagerTests {
             DefaultPluginManager(kernel: kernel)
         )
 
-        let plugin = PluginPluginManager()
+        let plugin = PluginPluginManager(entryVisibility: .always)
         try plugin.onBoot(kernel: kernel)
         try plugin.onReady(kernel: kernel)
         #expect(settings.entries.contains { $0.id == "plugin-manager" })
@@ -99,7 +102,7 @@ struct PluginPluginManagerTests {
             DefaultPluginManager(kernel: kernel)
         )
 
-        let plugin = PluginPluginManager()
+        let plugin = PluginPluginManager(entryVisibility: .always)
         try plugin.onBoot(kernel: kernel)
         try plugin.onReady(kernel: kernel)
 
@@ -109,13 +112,25 @@ struct PluginPluginManagerTests {
         #expect(entry?.order == 3)
     }
 
+    /// 提示建议跟随「插件管理」设置入口：入口存在时注册，指向该入口。
+    ///
+    /// 提示建议的注册推迟到 `onReady`（入口可见性要等全部插件就绪才能判断），
+    /// 所以这里要跑完整的 `onBoot` + `onReady`。
     @Test("浏览插件建议指向插件管理设置入口")
     func browseSuggestionTargetsPluginManagementEntry() throws {
+        let settings = DefaultSettingViewProviding()
         let suggestions = DefaultPromptSuggestionProvider()
         let kernel = KernelCoreContainer()
+        try kernel.registerProvider((any SettingViewProviding).self, settings)
         try kernel.registerProvider((any PromptSuggestionProviding).self, suggestions)
+        try kernel.registerProvider(
+            (any PluginManaging).self,
+            DefaultPluginManager(kernel: kernel)
+        )
 
-        try PluginPluginManager().onRegister(kernel: kernel)
+        let plugin = PluginPluginManager(entryVisibility: .always)
+        try plugin.onBoot(kernel: kernel)
+        try plugin.onReady(kernel: kernel)
 
         let suggestion = suggestions.allSuggestions.first { $0.title == "浏览插件" }
         #expect(suggestion?.action == .openSettingsTab(PluginPluginManager.settingsEntryID))

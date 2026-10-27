@@ -1,6 +1,7 @@
 import Foundation
 import KernelCore
 import ProviderPluginManaging
+import ProviderPromptSuggestion
 import ProviderSettingView
 import Testing
 
@@ -10,16 +11,18 @@ import Testing
 ///
 /// 背景：宿主的插件策略全是 `required` / `alwaysOn` 时（`isConfigurable` 为
 /// false），插件管理页必然是一个永远为空的列表 —— 这样的入口对用户没有意义。
-/// `.onlyWhenConfigurablePluginsExist` 让这类宿主跳过注册入口。
+/// 默认策略 `.onlyWhenConfigurablePluginsExist` 让这类宿主跳过注册入口，
+/// 且宿主**零配置**即可获得正确行为。
 @MainActor
 struct PluginPluginManagerEntryVisibilityTests {
 
-    /// 默认策略是 `.always`：即使宿主没有可配置插件，入口也照常注册。
+    /// 默认策略是 `.onlyWhenConfigurablePluginsExist`：宿主没有可配置插件时
+    /// 不注册入口。
     ///
-    /// 这条守卫盯住「默认行为被改掉」这个坑：Lumi 主项目有大量可配置插件，
-    /// 它的 UI 测试硬断言侧边栏存在「Plugin Manager」入口。
-    @Test("默认策略下入口始终注册")
-    func defaultVisibilityAlwaysRegistersEntry() throws {
+    /// 这条守卫盯住「默认行为反转后又被改回去」这个坑：默认必须是自动判断，
+    /// 否则每个宿主都要手工配置一次。
+    @Test("默认策略下无可配置插件时不注册入口")
+    func defaultVisibilitySkipsEntryWithoutConfigurablePlugins() throws {
         let settings = DefaultSettingViewProviding()
         let kernel = KernelCoreContainer()
         try kernel.registerProvider((any SettingViewProviding).self, settings)
@@ -32,35 +35,16 @@ struct PluginPluginManagerEntryVisibilityTests {
         let plugin = PluginPluginManager()
         try kernel.start(plugins: [plugin])
 
-        #expect(settings.entries.contains { $0.id == "plugin-manager" })
-    }
-
-    /// 宿主没有可配置插件时，`.onlyWhenConfigurablePluginsExist` 不注册入口。
-    @Test("宿主无可配置插件时不注册入口")
-    func skipsEntryWhenNoConfigurablePluginsExist() throws {
-        let settings = DefaultSettingViewProviding()
-        let kernel = KernelCoreContainer()
-        try kernel.registerProvider((any SettingViewProviding).self, settings)
-        try kernel.registerProvider(
-            (any PluginManaging).self,
-            DefaultPluginManager(kernel: kernel)
-        )
-
-        let plugin = PluginPluginManager(
-            entryVisibility: .onlyWhenConfigurablePluginsExist
-        )
-        try kernel.start(plugins: [
-            plugin,
-            TestPlugin(id: "always-on", policy: .alwaysOn),
-            TestPlugin(id: "required", policy: .required),
-        ])
-
         #expect(!settings.entries.contains { $0.id == "plugin-manager" })
     }
 
-    /// 宿主存在可配置插件时，`.onlyWhenConfigurablePluginsExist` 注册入口。
-    @Test("宿主存在可配置插件时注册入口")
-    func registersEntryWhenConfigurablePluginsExist() throws {
+    /// 默认策略下，宿主有可配置插件时注册入口（宿主零配置即得正确行为）。
+    ///
+    /// 这条守卫盯住「默认策略判断失效」这个坑：Lumi 主项目有大量可配置插件，
+    /// 它的 UI 测试硬断言侧边栏存在「Plugin Manager」入口 —— 宿主不传任何参数
+    /// 就必须能显示入口。
+    @Test("默认策略下有可配置插件时注册入口")
+    func defaultVisibilityRegistersEntryWithConfigurablePlugins() throws {
         let settings = DefaultSettingViewProviding()
         let kernel = KernelCoreContainer()
         try kernel.registerProvider((any SettingViewProviding).self, settings)
@@ -69,12 +53,30 @@ struct PluginPluginManagerEntryVisibilityTests {
             DefaultPluginManager(kernel: kernel)
         )
 
-        let plugin = PluginPluginManager(
-            entryVisibility: .onlyWhenConfigurablePluginsExist
-        )
+        let plugin = PluginPluginManager()
         try kernel.start(plugins: [
             plugin,
             TestPlugin(id: "optional", policy: .enabledByDefault),
+        ])
+
+        #expect(settings.entries.contains { $0.id == "plugin-manager" })
+    }
+
+    /// `.always` 强制显示：宿主没有可配置插件时也注册入口。
+    @Test("always 策略下强制注册入口")
+    func alwaysVisibilityRegistersEntryRegardless() throws {
+        let settings = DefaultSettingViewProviding()
+        let kernel = KernelCoreContainer()
+        try kernel.registerProvider((any SettingViewProviding).self, settings)
+        try kernel.registerProvider(
+            (any PluginManaging).self,
+            DefaultPluginManager(kernel: kernel)
+        )
+
+        let plugin = PluginPluginManager(entryVisibility: .always)
+        try kernel.start(plugins: [
+            plugin,
+            TestPlugin(id: "always-on", policy: .alwaysOn),
         ])
 
         #expect(settings.entries.contains { $0.id == "plugin-manager" })
@@ -95,9 +97,7 @@ struct PluginPluginManagerEntryVisibilityTests {
             DefaultPluginManager(kernel: kernel)
         )
 
-        let plugin = PluginPluginManager(
-            entryVisibility: .onlyWhenConfigurablePluginsExist
-        )
+        let plugin = PluginPluginManager()
         // 插件管理器 order = 90，可配置插件 order = 999（更大 → 更晚 boot）。
         try kernel.start(plugins: [
             plugin,
@@ -118,15 +118,59 @@ struct PluginPluginManagerEntryVisibilityTests {
             DefaultPluginManager(kernel: kernel)
         )
 
-        let plugin = PluginPluginManager(
-            entryVisibility: .onlyWhenConfigurablePluginsExist
-        )
+        let plugin = PluginPluginManager()
         try kernel.start(plugins: [
             plugin,
             TestPlugin(id: "turned-off", policy: .disabled),
         ])
 
         #expect(!settings.entries.contains { $0.id == "plugin-manager" })
+    }
+
+    /// 入口不存在时，「浏览插件」提示建议也要撤掉。
+    ///
+    /// 这条守卫盯住「深链指向不存在的设置页」这个坑：提示建议的动作是
+    /// `openSettingsTab("plugin-manager")`，入口被撤掉后这个深链就是死路。
+    @Test("入口不存在时不注册浏览插件提示建议")
+    func doesNotRegisterPromptSuggestionWithoutEntry() throws {
+        let settings = DefaultSettingViewProviding()
+        let suggestions = DefaultPromptSuggestionProvider()
+        let kernel = KernelCoreContainer()
+        try kernel.registerProvider((any SettingViewProviding).self, settings)
+        try kernel.registerProvider((any PromptSuggestionProviding).self, suggestions)
+        try kernel.registerProvider(
+            (any PluginManaging).self,
+            DefaultPluginManager(kernel: kernel)
+        )
+
+        let plugin = PluginPluginManager()
+        try kernel.start(plugins: [plugin])
+        #expect(!settings.entries.contains { $0.id == "plugin-manager" })
+        #expect(!suggestions.allSuggestions.contains { $0.id == "\(plugin.id).browse" })
+    }
+
+    /// 入口存在时，「浏览插件」提示建议注册并指向该入口。
+    @Test("入口存在时注册浏览插件提示建议")
+    func registersPromptSuggestionWithEntry() throws {
+        let settings = DefaultSettingViewProviding()
+        let suggestions = DefaultPromptSuggestionProvider()
+        let kernel = KernelCoreContainer()
+        try kernel.registerProvider((any SettingViewProviding).self, settings)
+        try kernel.registerProvider((any PromptSuggestionProviding).self, suggestions)
+        try kernel.registerProvider(
+            (any PluginManaging).self,
+            DefaultPluginManager(kernel: kernel)
+        )
+
+        let plugin = PluginPluginManager()
+        try kernel.start(plugins: [
+            plugin,
+            TestPlugin(id: "optional", policy: .enabledByDefault),
+        ])
+
+        let suggestion = suggestions.allSuggestions.first { $0.id == "\(plugin.id).browse" }
+        #expect(suggestion != nil)
+        #expect(suggestion?.action == .openSettingsTab(PluginPluginManager.settingsEntryID))
     }
 }
 
