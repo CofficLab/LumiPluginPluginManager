@@ -21,6 +21,11 @@ final class PluginManagementViewModel: ObservableObject {
     @Published private(set) var selectedPluginID: String?
     @Published private(set) var isDisablingAll = false
 
+    /// 最近一次启停失败的原因；成功后清空。
+    ///
+    /// 启停失败时界面据此展示错误横幅，避免开关静默停留在与实际不一致的位置。
+    @Published private(set) var errorMessage: String?
+
     private let capability: any PluginManagementCapability
     private let docsCapability: PluginManagerDocsCapability
     private var updatingPluginIDs = Set<String>()
@@ -81,6 +86,15 @@ final class PluginManagementViewModel: ObservableObject {
         plugins.count >= Self.searchVisibilityThreshold
     }
 
+    // MARK: - 错误提示
+
+    /// 清除错误提示。
+    func clearError() {
+        errorMessage = nil
+    }
+
+    // MARK: - 数据源
+
     /// Observer 收到插件列表或启用状态事件后调用，重新生成整个页面状态。
     func refresh() {
         plugins = capability.allPlugins
@@ -111,6 +125,11 @@ final class PluginManagementViewModel: ObservableObject {
         updatingPluginIDs.contains(pluginID)
     }
 
+    // MARK: - 启停
+
+    /// 切换单个插件的启用状态。
+    ///
+    /// 失败时记录原因并重读能力层状态，保证开关不会停留在与实际不一致的位置。
     func setEnabled(_ enabled: Bool, for pluginID: String) {
         guard !isUpdating(pluginID: pluginID) else { return }
         updatingPluginIDs.insert(pluginID)
@@ -118,14 +137,17 @@ final class PluginManagementViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self else { return }
             defer { updatingPluginIDs.remove(pluginID) }
-            if enabled {
-                _ = await capability.enablePlugin(id: pluginID)
-            } else {
-                _ = await capability.disablePlugin(id: pluginID)
-            }
+            let succeeded = enabled
+                ? await capability.enablePlugin(id: pluginID)
+                : await capability.disablePlugin(id: pluginID)
+            refresh()
+            errorMessage = succeeded ? nil : capability.lastErrorDescription
         }
     }
 
+    /// 停用全部已启用插件。
+    ///
+    /// 任一插件停用失败时记录最后一次失败原因，其余插件继续处理。
     func disableAllPlugins() {
         guard !isDisablingAll else { return }
         isDisablingAll = true
@@ -134,9 +156,13 @@ final class PluginManagementViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self else { return }
             defer { isDisablingAll = false }
+            var failure: String?
             for pluginID in enabledPluginIDs {
-                _ = await capability.disablePlugin(id: pluginID)
+                guard !(await capability.disablePlugin(id: pluginID)) else { continue }
+                failure = capability.lastErrorDescription
             }
+            refresh()
+            errorMessage = failure
         }
     }
 

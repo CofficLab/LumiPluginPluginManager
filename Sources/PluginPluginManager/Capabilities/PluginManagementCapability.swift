@@ -5,6 +5,13 @@ import ProviderPluginManaging
 @MainActor
 protocol PluginManagementCapability: AnyObject {
     var allPlugins: [any SuperPlugin] { get }
+
+    /// 最近一次启停失败的原因；成功或未操作为 `nil`。
+    ///
+    /// 底层 `PluginControlling` 已提供该语义，插件管理页据此在启停失败时
+    /// 展示错误横幅，而不是让开关静默停留在与实际不一致的位置。
+    var lastErrorDescription: String? { get }
+
     func isEnabled(id: String) -> Bool
     func enablePlugin(id: String) async -> Bool
     func disablePlugin(id: String) async -> Bool
@@ -25,6 +32,8 @@ final class PluginManagementCapabilityAdapter: PluginManagementCapability {
     }
 
     var allPlugins: [any SuperPlugin] { manager.allPlugins }
+
+    var lastErrorDescription: String? { manager.lastErrorDescription }
 
     func isEnabled(id: String) -> Bool {
         manager.isEnabled(id: id)

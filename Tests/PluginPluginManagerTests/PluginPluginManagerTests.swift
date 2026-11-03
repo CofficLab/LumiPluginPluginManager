@@ -190,6 +190,60 @@ struct PluginPluginManagerTests {
         try plugin.onBoot(kernel: kernel) // 不应抛错
         #expect(kernel.resolveProvider((any SettingViewProviding).self) == nil)
     }
+
+    // MARK: - 启停失败反馈
+
+    /// 启停失败时记录失败原因，供界面展示错误横幅。
+    @Test("启停失败时记录失败原因")
+    func enableFailureRecordsErrorMessage() async {
+        let plugin = TestPlugin(id: "target", policy: .enabledByDefault)
+        let capability = TestPluginManagementCapability(plugins: [plugin])
+        capability.failingPluginIDs = ["target"]
+        capability.lastErrorDescription = "启停失败：内核未就绪"
+        let viewModel = PluginManagementViewModel(
+            capability: capability,
+            docsCapability: PluginManagerDocsCapabilityAdapter(docs: nil)
+        )
+        viewModel.refresh()
+
+        viewModel.setEnabled(true, for: "target")
+        await waitForPendingUpdates(viewModel)
+
+        #expect(viewModel.errorMessage == "启停失败：内核未就绪")
+    }
+
+    /// 启停成功后清除上一次的失败原因。
+    @Test("启停成功后清除错误原因")
+    func enableSuccessClearsErrorMessage() async {
+        let plugin = TestPlugin(id: "target", policy: .enabledByDefault)
+        let capability = TestPluginManagementCapability(plugins: [plugin])
+        capability.lastErrorDescription = "上一次的错误"
+        let viewModel = PluginManagementViewModel(
+            capability: capability,
+            docsCapability: PluginManagerDocsCapabilityAdapter(docs: nil)
+        )
+        viewModel.refresh()
+
+        viewModel.setEnabled(true, for: "target")
+        await waitForPendingUpdates(viewModel)
+
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    /// 手动清除错误提示。
+    @Test("可以手动清除错误提示")
+    func clearErrorResetsMessage() {
+        let capability = TestPluginManagementCapability(plugins: [])
+        let viewModel = PluginManagementViewModel(
+            capability: capability,
+            docsCapability: PluginManagerDocsCapabilityAdapter(docs: nil)
+        )
+        viewModel.refresh()
+
+        viewModel.setEnabled(true, for: "missing")
+        viewModel.clearError()
+        #expect(viewModel.errorMessage == nil)
+    }
 }
 
 @MainActor
@@ -212,6 +266,12 @@ private final class TestPluginManagementCapability: PluginManagementCapability {
     var plugins: [any SuperPlugin]
     var enabledIDs: Set<String> = []
 
+    /// 模拟最近一次启停失败的原因。
+    var lastErrorDescription: String?
+
+    /// 启停时返回失败的插件 id；为空表示全部成功。
+    var failingPluginIDs: Set<String> = []
+
     init(plugins: [any SuperPlugin]) {
         self.plugins = plugins
     }
@@ -222,9 +282,13 @@ private final class TestPluginManagementCapability: PluginManagementCapability {
         enabledIDs.contains(id)
     }
 
-    func enablePlugin(id: String) async -> Bool { true }
+    func enablePlugin(id: String) async -> Bool {
+        !failingPluginIDs.contains(id)
+    }
 
-    func disablePlugin(id: String) async -> Bool { true }
+    func disablePlugin(id: String) async -> Bool {
+        !failingPluginIDs.contains(id)
+    }
 
     func addObserver(
         _ callback: @escaping (PluginManagingEvent) -> Void
@@ -236,4 +300,16 @@ private final class TestPluginManagementCapability: PluginManagementCapability {
 @MainActor
 private final class TestPluginManagementObserverHandle: PluginManagingObserverHandle {
     func cancel() {}
+}
+
+/// 等待进行中的启停操作落地。
+///
+/// 启停由 ViewModel 内部派发 `Task { @MainActor }` 执行，断言前需要确保
+/// 它已经结束，否则读到的是操作前的状态。
+@MainActor
+private func waitForPendingUpdates(_ viewModel: PluginManagementViewModel) async {
+    let pluginIDs = viewModel.plugins.map(\.id)
+    while pluginIDs.contains(where: { viewModel.isUpdating(pluginID: $0) }) || viewModel.isDisablingAll {
+        await Task.yield()
+    }
 }
