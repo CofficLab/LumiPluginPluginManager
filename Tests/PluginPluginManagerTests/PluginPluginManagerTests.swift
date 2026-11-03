@@ -65,6 +65,17 @@ struct PluginPluginManagerTests {
         #expect(plugin.metadata.stage == .stable)
     }
 
+    /// 宿主可以指定插件自身的启用策略。
+    ///
+    /// 宿主若不希望这个插件进入内核（连同它贡献的「插件管理」设置入口一并
+    /// 消失），传 `.disabled` —— 内核启动时会彻底排除它。
+    @Test("可以指定插件自身的启用策略")
+    func policyIsConfigurableByHost() {
+        #expect(PluginPluginManager().metadata.policy == .required)
+        #expect(PluginPluginManager(policy: .disabled).metadata.policy == .disabled)
+        #expect(PluginPluginManager(policy: .alwaysOn).metadata.policy == .alwaysOn)
+    }
+
     /// onReady 注册「插件管理」设置入口；onShutdown 撤回入口。
     ///
     /// 入口在 `onReady`（而非 `onBoot`）注册：`entryVisibility` 需要依据

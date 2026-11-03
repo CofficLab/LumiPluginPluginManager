@@ -59,17 +59,29 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
     /// 入口可见性策略。默认 `.onlyWhenConfigurablePluginsExist`，宿主零配置。
     public let entryVisibility: EntryVisibility
 
+    /// 插件自身的启用策略。
+    ///
+    /// 默认 `.required`：插件管理器是其它插件启停的观察者与呈现者，
+    /// 自身被停用会让用户失去管理插件的入口。
+    ///
+    /// 宿主若明确不希望这个插件进入内核（连同它贡献的「插件管理」设置
+    /// 入口一并消失），可传 `.disabled` —— 内核启动时会彻底排除它。
+    public let policy: PluginEnablePolicy
+
     /// 创建插件管理插件。
     ///
     /// - Parameters:
     ///   - id: 插件唯一标识，决定 `PluginMetadata.id` 与日志子系统。
     ///   - entryVisibility: 「插件管理」设置入口的可见性策略。
+    ///   - policy: 插件自身的启用策略。
     public init(
         id: String = PluginPluginManager.defaultPluginID,
-        entryVisibility: EntryVisibility = .onlyWhenConfigurablePluginsExist
+        entryVisibility: EntryVisibility = .onlyWhenConfigurablePluginsExist,
+        policy: PluginEnablePolicy = .required
     ) {
         self.id = id
         self.entryVisibility = entryVisibility
+        self.policy = policy
         self.metadata = PluginMetadata(
             id: id,
             name: pluginLocalization.string("Plugin Manager"),
@@ -77,7 +89,7 @@ public final class PluginPluginManager: SuperPlugin, SuperLog {
             version: "1.0.0",
             category: .system,
             stage: .stable,
-            policy: .required
+            policy: policy
         )
         self.logger = Logger(subsystem: id, category: "PluginManager")
     }
