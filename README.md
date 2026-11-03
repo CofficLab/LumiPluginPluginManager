@@ -35,6 +35,24 @@ manifest 包名不带 `Lumi` 前缀会让用户在 Xcode 里看不到前缀。�
 - 插件 About / 手册页面贡献（通过 `ProviderDocsView`）
 - 「浏览插件」快捷建议注册（通过 `ProviderPromptSuggestion`）
 
+## 启停失败反馈
+
+启用 / 停用插件失败时，页面会用 `AppErrorBanner` 展示失败原因，而不是让开关
+静默停留在与实际不一致的位置。
+
+失败原因来自底层 `PluginControlling.lastErrorDescription`（经
+`PluginManagementCapability` 透出），成功一次即清空。
+
+## 响应式布局
+
+| 宽度 | 布局 |
+| --- | --- |
+| 常规（macOS / iPad） | 左侧插件列表 + 右侧详情面板的贴边分栏 |
+| 紧凑（iPhone） | 插件列表，点击后 `NavigationLink` 推入详情面板 |
+
+分栏形态是设置页的基准（列表栏 300、详情栏内边距 22、贴边无外框），
+紧凑形态只改容器排布，列表行与详情面板本身保持一致。
+
 ## 依赖与集成
 
 ```swift
