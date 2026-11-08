@@ -1,59 +1,54 @@
 # LumiPluginPluginManager
 
-Lumi 插件管理器插件的**共享远程包**，供 Lumi / Cisum / GameFactory / GitOK / Kuzee / Wakey
-等 CofficLab 兄弟应用共同消费。
+📖 English | [中文版](README_zh.md)
 
-> **重要规则：本插件包不能依赖其他插件包，也不能被其他插件包依赖。**
+Shared **remote package** for the Lumi plugin manager plugin, consumed by CofficLab sibling apps such as Lumi / Cisum / GameFactory / GitOK / Kuzee / Wakey.
+
+> **Important rule: this plugin package must not depend on other plugin packages, and must not be depended on by other plugin packages.**
 >
-> 插件之间只通过 Provider 契约通信：共享能力放入 `Provider*` / `Kit*` 包，
-> 由宿主（`Factory*`）统一装配；跨插件互相引用会破坏插件的独立装配与卸载。
+> Plugins communicate only through Provider contracts: shared capabilities go into `Provider*` / `Kit*` packages, assembled uniformly by the host (`Factory*`); cross-plugin references break independent plugin assembly and uninstallation.
 
 ## Package
 
-- Manifest 包名：`LumiPluginPluginManager`（与仓库名一致，符合远程插件包命名规范）
-- Product / Target：`PluginPluginManager`（不带 `Lumi` 前缀）
+- Manifest package name: `LumiPluginPluginManager` (matches the repository name, per the remote plugin package naming convention)
+- Product / Target: `PluginPluginManager` (without the `Lumi` prefix)
 - Platform: macOS 14+ / iOS 17+
 - Swift tools: 6.0
 
-## 命名规范
+## Naming Convention
 
-CofficLab 的远程插件包统一遵循：
+CofficLab remote plugin packages follow this convention uniformly:
 
-| 仓库名 | manifest `name:` | product / target |
+| Repository | manifest `name:` | product / target |
 | --- | --- | --- |
 | `LumiPluginPluginManager` | `LumiPluginPluginManager` | `PluginPluginManager` |
 | `LumiPluginActivityBar` | `LumiPluginActivityBar` | `PluginActivityBar` |
 | `LumiPluginToast` | `LumiPluginToast` | `PluginToast` |
 
-理由：Xcode 的包依赖列表显示的是上游 manifest 里的 `Package(name:)`，不是仓库名。
-manifest 包名不带 `Lumi` 前缀会让用户在 Xcode 里看不到前缀。仓库名保持与包名一致，
-消费方 `.product(name:package:)` 的 `package:` 参数按 URL basename 匹配，必须写仓库名。
+Why: Xcode's package dependency list shows the upstream manifest's `Package(name:)`, not the repository name. Without the `Lumi` prefix in the manifest package name, users would not see the prefix in Xcode. The repository name stays consistent with the package name, and the consumer's `.product(name:package:)` `package:` argument matches the URL basename, so it must be the repository name.
 
-## 提供什么
+## What It Provides
 
-- 插件管理入口：浏览插件列表、启用 / 禁用单个插件、跳转到插件设置详情
-- 插件 About / 手册页面贡献（通过 `ProviderDocsView`）
-- 「浏览插件」快捷建议注册（通过 `ProviderPromptSuggestion`）
+- Plugin management entry: browse the plugin list, enable/disable individual plugins, jump to plugin settings details
+- Plugin About / manual page contribution (via `ProviderDocsView`)
+- "Browse plugins" prompt suggestion registration (via `ProviderPromptSuggestion`)
 
-## 启停失败反馈
+## Enable/Disable Failure Feedback
 
-启用 / 停用插件失败时，页面会用 `AppErrorBanner` 展示失败原因，而不是让开关
-静默停留在与实际不一致的位置。
+When enabling/disabling a plugin fails, the page shows the failure reason via `AppErrorBanner`, instead of leaving the toggle silently in a position inconsistent with reality.
 
-失败原因来自底层 `PluginControlling.lastErrorDescription`（经
-`PluginManagementCapability` 透出），成功一次即清空。
+The failure reason comes from the underlying `PluginControlling.lastErrorDescription` (surfaced through `PluginManagementCapability`) and is cleared on the next success.
 
-## 响应式布局
+## Responsive Layout
 
-| 宽度 | 布局 |
+| Width | Layout |
 | --- | --- |
-| 常规（macOS / iPad） | 左侧插件列表 + 右侧详情面板的贴边分栏 |
-| 紧凑（iPhone） | 插件列表，点击后 `NavigationLink` 推入详情面板 |
+| Regular (macOS / iPad) | Edge-to-edge split view with the plugin list on the left and the detail panel on the right |
+| Compact (iPhone) | Plugin list, tapping pushes the detail panel via `NavigationLink` |
 
-分栏形态是设置页的基准（列表栏 300、详情栏内边距 22、贴边无外框），
-紧凑形态只改容器排布，列表行与详情面板本身保持一致。
+The split form is the baseline for the settings page (list column 300, detail column padding 22, edge-to-edge with no outer border); the compact form only changes the container arrangement — list rows and the detail panel itself stay the same.
 
-## 依赖与集成
+## Dependencies and Integration
 
 ```swift
 dependencies: [
@@ -69,69 +64,58 @@ targets: [
 ]
 ```
 
-注意 `package:` 必须是仓库名 `LumiPluginPluginManager`，不是 product 名。
+Note that `package:` must be the repository name `LumiPluginPluginManager`, not the product name.
 
-## 品牌化：注入自己的插件 id
+## Branding: Inject Your Own Plugin ID
 
-宿主应用可以用自己的品牌 id 复用本包（与 `PluginSettingView` / `PluginStorage` /
-`PluginToast` 的做法一致）。不传参时使用默认的 `com.coffic.lumi.plugin.plugin-manager`。
+Host apps can reuse this package with their own brand ID (consistent with the `PluginSettingView` / `PluginStorage` / `PluginToast` approach). When not passed, the default `com.coffic.lumi.plugin.plugin-manager` is used.
 
 ```swift
 PluginPluginManager(id: "com.coffic.wakey.plugin.plugin-manager")
 ```
 
-注入后以下三处同步跟随：
+After injection, the following three places follow along:
 
-| 位置 | 取值 |
+| Location | Value |
 | --- | --- |
-| `PluginPluginManager.id` | 注入的 id |
-| `PluginPluginManager.metadata.id` | 注入的 id |
-| 日志 subsystem（`Logger`） | 注入的 id |
+| `PluginPluginManager.id` | Injected ID |
+| `PluginPluginManager.metadata.id` | Injected ID |
+| Log subsystem (`Logger`) | Injected ID |
 
-设置入口 id 恒为 `"plugin-manager"`（与品牌无关，供设置深链使用）；
-提示建议 id 为 `"\(id).browse"`。
+The settings entry ID is always `"plugin-manager"` (brand-independent, for settings deep links); the prompt suggestion ID is `"\(id).browse"`.
 
-> 更换 id 会同时更换插件的启用状态存储键：宿主切换 id 前需确认历史状态是否需要迁移。
+> Changing the ID also changes the plugin's enabled-state storage key: before switching IDs, hosts should confirm whether historical state needs migration.
 
-## 入口可见性：无可配置插件时隐藏入口
+## Entry Visibility: Hide the Entry When No Configurable Plugins Exist
 
-插件管理页只列出**用户可配置**的插件（`PluginEnablePolicy.isConfigurable`，
-即 `enabledByDefault` / `disabledByDefault`）。
+The plugin management page only lists **user-configurable** plugins (`PluginEnablePolicy.isConfigurable`, i.e. `enabledByDefault` / `disabledByDefault`).
 
-若宿主的插件策略全是 `required` / `alwaysOn`（`isConfigurable` 为 false），
-这个页面必然是一个永远为空的列表 —— 这样的入口对用户没有意义，反而让人以为
-功能坏了。
+If a host's plugin policies are all `required` / `alwaysOn` (`isConfigurable` is false), this page is necessarily a permanently empty list — such an entry is meaningless to users and instead makes them think the feature is broken.
 
-**默认行为就是隐藏**：宿主零配置即可得到正确结果，无需在 Factory 里写任何
-参数。宿主将来加入可配置插件时，入口会自动出现。
+**The default behavior is to hide**: hosts get the correct result with zero configuration, without writing any arguments in the Factory. When the host later adds configurable plugins, the entry appears automatically.
 
-| 策略 | 行为 |
+| Policy | Behavior |
 | --- | --- |
-| `.onlyWhenConfigurablePluginsExist`（默认） | 仅当宿主存在用户可配置的插件时注册入口 |
-| `.always` | 始终注册「插件管理」入口 |
+| `.onlyWhenConfigurablePluginsExist` (default) | Register the entry only when the host has user-configurable plugins |
+| `.always` | Always register the "Plugin Manager" entry |
 
-绝大多数宿主不需要显式传任何值：
+Most hosts need not pass any value explicitly:
 
 ```swift
-PluginPluginManager()   // 零配置：无可配置插件时不显示入口
+PluginPluginManager()   // zero configuration: hide the entry when no configurable plugins
 ```
 
-仅在宿主明知自己没有可配置插件、却仍要保留这个入口时才显式覆盖：
+Only override explicitly when the host knowingly has no configurable plugins but still wants to keep this entry:
 
 ```swift
 PluginPluginManager(entryVisibility: .always)
 ```
 
-> 判断发生在 `onReady` 阶段（而非 `onBoot`）：`KernelCoreContainer.start` 先注册
-> 全部插件、再逐个执行 `onBoot`，`onBoot` 阶段 order 更大的插件尚未注册，
-> 据此判断会漏掉插件。
+> The decision happens at the `onReady` stage (not `onBoot`): `KernelCoreContainer.start` registers all plugins first, then executes `onBoot` one by one; during `onBoot`, plugins with a larger `order` are not yet registered, so judging then would miss plugins.
 
-「浏览插件」提示建议跟随入口：入口不存在时不会注册该建议 —— 它的动作是
-`openSettingsTab("plugin-manager")`，入口被撤掉后这个深链就是死路。
+The "Browse plugins" prompt suggestion follows the entry: when the entry does not exist, the suggestion is not registered either — its action is `openSettingsTab("plugin-manager")`, and once the entry is withdrawn this deep link is a dead end.
 
-> 入口的可见性在启动时判定一次。当前插件目录是编译期固定的
-> （`unloadPlugin` / `reloadPlugin` 在生产代码中未被调用），运行期插件列表
-> 事实上不会变化，因此不需要监听插件列表变化事件。
+> Entry visibility is decided once at startup. The current plugin catalog is fixed at compile time (`unloadPlugin` / `reloadPlugin` are not called in production code), so the runtime plugin list effectively never changes; there is no need to listen for plugin list change events.
 
 ## Testing
 
@@ -141,10 +125,8 @@ From this package directory:
 swift test
 ```
 
-## 能力边界
+## Capability Boundary
 
-`PluginManagementViewModel` 原先直接持有 `any DocsViewProviding`，现改为只依赖
-`PluginManagerDocsCapability`（`aboutEntry(for:)`），由
-`PluginManagerDocsCapabilityAdapter` 收窄内核的 `DocsViewProviding`。
+`PluginManagementViewModel` previously held `any DocsViewProviding` directly; it now depends only on `PluginManagerDocsCapability` (`aboutEntry(for:)`), with `PluginManagerDocsCapabilityAdapter` narrowing the kernel's `DocsViewProviding`.
 
-注册 / 移除 About 条目仍由插件入口负责（它们属于组装层职责），不需要进入窄协议。
+Registering/removing About entries remains the responsibility of the plugin entry (they belong to the assembly layer) and does not need to enter the narrow protocol.
