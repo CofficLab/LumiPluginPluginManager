@@ -2,7 +2,7 @@
 
 📖 English | [中文版](README_zh.md)
 
-Shared **remote package** for the Lumi plugin manager plugin, consumed by CofficLab sibling apps such as Lumi / Cisum / GameFactory / GitOK / Kuzee / Wakey.
+Shared **remote package** for the Lumi plugin manager plugin, consumed by Lumi family sibling apps such as Lumi / Cisum / GameFactory / GitOK / Kuzee / Wakey.
 
 > **Important rule: this plugin package must not depend on other plugin packages, and must not be depended on by other plugin packages.**
 >
@@ -17,7 +17,7 @@ Shared **remote package** for the Lumi plugin manager plugin, consumed by Coffic
 
 ## Naming Convention
 
-CofficLab remote plugin packages follow this convention uniformly:
+Lumi Softworks remote plugin packages follow this convention uniformly:
 
 | Repository | manifest `name:` | product / target |
 | --- | --- | --- |

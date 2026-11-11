@@ -3,7 +3,7 @@
 📖 [中文版](README_zh.md) | [English](README.md)
 
 Lumi 插件管理器插件的**共享远程包**，供 Lumi / Cisum / GameFactory / GitOK / Kuzee / Wakey
-等 CofficLab 兄弟应用共同消费。
+等 Lumi 家族兄弟应用共同消费。
 
 > **重要规则：本插件包不能依赖其他插件包，也不能被其他插件包依赖。**
 >
@@ -19,7 +19,7 @@ Lumi 插件管理器插件的**共享远程包**，供 Lumi / Cisum / GameFactor
 
 ## 命名规范
 
-CofficLab 的远程插件包统一遵循：
+Lumi Softworks 的远程插件包统一遵循：
 
 | 仓库名 | manifest `name:` | product / target |
 | --- | --- | --- |
