@@ -59,7 +59,7 @@ manifest 包名不带 `Lumi` 前缀会让用户在 Xcode 里看不到前缀。�
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/CofficLab/LumiPluginPluginManager.git", from: "1.0.0"),
+    .package(url: "https://github.com/lumi-softworks/LumiPluginPluginManager.git", from: "1.0.0"),
 ],
 targets: [
     .target(

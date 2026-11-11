@@ -52,7 +52,7 @@ The split form is the baseline for the settings page (list column 300, detail co
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/CofficLab/LumiPluginPluginManager.git", from: "1.0.0"),
+    .package(url: "https://github.com/lumi-softworks/LumiPluginPluginManager.git", from: "1.0.0"),
 ],
 targets: [
     .target(
